@@ -299,3 +299,57 @@ export function getRecentNamesCount(): number {
 export function getRecentNames(): string[] {
 	return [...recentNames];
 }
+
+/**
+ * Generate a random tour name
+ *
+ * Creates names like:
+ * - "Electric Paradise Tour"
+ * - "Midnight Dreams World Tour"
+ * - "The Golden Night Tour"
+ *
+ * @returns Generated tour name
+ *
+ * @example
+ * ```typescript
+ * const tourName = generateTourName();
+ * console.log(tourName); // "Electric Paradise Tour"
+ * ```
+ */
+export function generateTourName(): string {
+	const patterns = [
+		// [Adjective] [Noun] Tour
+		() => `${getRandomWord(ADJECTIVES)} ${getRandomWord(NOUNS)} Tour`,
+		// [Color] [Noun] Tour
+		() => `${getRandomWord(COLORS)} ${getRandomWord(NOUNS)} Tour`,
+		// The [Adjective] [Noun] Tour
+		() => `The ${getRandomWord(ADJECTIVES)} ${getRandomWord(NOUNS)} Tour`,
+		// [Emotion] [Nouns] Tour
+		() => `${getRandomWord(EMOTIONS)} ${getRandomWord(NOUNS)}s Tour`,
+		// [Noun] World Tour
+		() => `${getRandomWord(NOUNS)} World Tour`,
+		// [Adjective] [Place] Tour
+		() => `${getRandomWord(ADJECTIVES)} ${getRandomWord(PLACES)} Tour`,
+		// [Verb]ing the [Place]
+		() => `${getRandomWord(VERBS)}ing the ${getRandomWord(PLACES)}`
+	];
+
+	// Try to generate unique name
+	let attempts = 0;
+	let name = '';
+
+	while (attempts < 10) {
+		const pattern = patterns[Math.floor(Math.random() * patterns.length)];
+		name = pattern();
+
+		if (!isRecentName(name)) {
+			addToRecentNames(name);
+			return name;
+		}
+
+		attempts++;
+	}
+
+	addToRecentNames(name);
+	return name;
+}
