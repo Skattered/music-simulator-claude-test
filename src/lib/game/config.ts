@@ -84,7 +84,7 @@ export function createInitialGameState(): GameState {
 
 		// Tech progression
 		currentTechTier: 1, // Start at tier 1: Third-party Web Services
-		purchasedUpgrades: [],
+		purchasedUpgrades: ['tech_1_1'], // Player starts with Basic Web Services
 		activeBoosts: [],
 
 		// Physical albums (unlocked later)
