@@ -1,0 +1,85 @@
+{
+	"$schema": "https://json-schema.org/draft-07/schema#",
+	"description": "Music Industry Simulator - Balance Configuration",
+	"streaming": {
+		"baseRate": 0.001,
+		"description": "Revenue per fan per song per tick",
+		"platformMultiplierDefault": 1.0,
+		"minIncomePercentage": 0.15,
+		"maxIncomePercentage": 0.30,
+		"comment": "Streaming must remain 15-30% of total income throughout game"
+	},
+	"albums": {
+		"interestRate": 0.01,
+		"description": "Percentage of fans buying per day at peak demand",
+		"lifetimeDays": 30,
+		"demandDecayRate": 0.15,
+		"cooldownHours": 48,
+		"baseCopiesPerDollar": 10,
+		"scalePenalty": 0.5,
+		"profitMargin": 1.5,
+		"comment": "Albums provide burst income with exponential demand decay"
+	},
+	"tours": {
+		"minDurationDays": 30,
+		"maxDurationDays": 90,
+		"minMultiplier": 1.5,
+		"maxMultiplier": 3.0,
+		"minCooldownDays": 14,
+		"maxCooldownDays": 30,
+		"baseCost": 10000,
+		"fanCostScaling": 0.5,
+		"description": "Tours provide temporary multipliers to ALL income",
+		"comment": "Only 1 tour active at a time, no stacking allowed"
+	},
+	"tierScaling": {
+		"minMultiplier": 1.5,
+		"maxMultiplier": 2.5,
+		"absoluteMax": 5.0,
+		"previousTierMinContribution": 0.20,
+		"description": "All tier progression must follow these scaling rules",
+		"comment": "Never exceed 5x jump between tiers"
+	},
+	"balance": {
+		"maxSingleSourcePercentage": 0.60,
+		"minIncomeStreams": 2,
+		"maxIncomeStreams": 3,
+		"description": "Overall balance constraints",
+		"comment": "No single income source should dominate"
+	},
+	"gameSettings": {
+		"tickRate": 0.1,
+		"ticksPerSecond": 10,
+		"autoSaveInterval": 10,
+		"description": "Core game loop timing settings"
+	},
+	"initialValues": {
+		"startingMoney": 10,
+		"firstSongCost": 1,
+		"firstSongGenerationTime": 30,
+		"firstSongIncomePerTick": 0.0001,
+		"description": "Starting values for new game"
+	},
+	"unlockRequirements": {
+		"physicalAlbums": {
+			"songs": 100,
+			"fans": 10000,
+			"money": 5000
+		},
+		"tours": {
+			"albums": 10,
+			"fans": 100000,
+			"techTier": 3
+		},
+		"platformOwnership": {
+			"tours": 50,
+			"fans": 1000000,
+			"techTier": 6
+		},
+		"fullAutomation": {
+			"platforms": 3,
+			"fans": 10000000,
+			"techTier": 7
+		}
+	}
+}
