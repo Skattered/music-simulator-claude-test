@@ -1,0 +1,86 @@
+# 1
+
+Kongregate Developers — The Math of Idle Games, Part I
+October 4, 2016
+
+This is a concise extraction of the original article focusing on the core ideas and useful formulas for designing and balancing incremental / idle games.
+
+Key concepts
+- Primary currency: The main resource that increments (usually "money").
+- Generator: An item that produces primary currency; income is measured in currency per second.
+- Primary exchange currency: Sometimes generators produce a different resource that is exchanged for the primary currency.
+- Multiplier: Any upgrade or mechanic that multiplies generator output (temporary or persistent).
+- Prestige: A reset of many game elements (generators, multipliers) in exchange for a prestige currency or persistent multiplier that accelerates future runs.
+
+Core model
+At a basic level idle games balance production rates and costs. Generators usually follow exponential cost growth and linear (or near-linear) production growth, and players decide how to allocate currency between buying more generators and investing in multipliers or prestige.
+
+Typical formulas:
+- Cost of next unit:
+  cost_next = cost_base * (rate_growth)^owned
+
+- Total production:
+  production_total = (production_base * owned) * multipliers
+
+Example: AdVenture Capitalist (Lemonade Stands)
+- rate_growth = 1.07
+- cost_base ≈ 4 (note: first stand may be free so the effective first paid cost can be different)
+- production_base = 1.67 / sec
+
+If you own 10 lemonade stands:
+- cost_next = 4 * (1.07)^10 ≈ 7.87
+- production_total = (1.67 * 10) * 1 = 16.7 / sec
+
+Observations about growth and balance
+- Exponential functions (n^x for n > 1) eventually outpace any polynomial (x^k); this explains why generator costs eventually become prohibitive and why prestige mechanics are useful.
+- Early in a run, production can exceed the cost of new generators, enabling rapid growth. Over time, costs slow progress and force strategic decisions (when to prestige, which generators to buy, and when to buy multipliers).
+- With multiple generators that have different costs and production rates, players choose investments; newer generators often dominate income once they can be afforded unless multipliers or generator design create non-trivial choice.
+
+Design notes
+- Stacking multipliers (for example, x2 at 25 and 50 owned) produce purchase spikes and can lengthen the phase where a generator is relevant.
+- Without purchasable upgrades, the newest generator tends to become dominant; adding multiplier upgrades or varying multiplier effectiveness across generators can create more interesting priorities and trade-offs.
+- Tweaking multiplier values, rates, and base production can change the ordering of which generators matter as the game progresses, creating richer player decisions.
+
+Bulk-buy formulas (avoid brute-force loops)
+Variables:
+- n = number of generators to buy
+- b = base price (cost_base)
+- r = price growth rate (rate_growth)
+- k = number currently owned
+- c = amount of currency owned
+
+Cost to buy n generators starting from k owned:
+  cost = b * r^k * (r^n - 1) / (r - 1)
+
+Maximum number you can buy with currency c:
+  max = floor( log_r( c * (r - 1) / (b * r^k) + 1 ) )
+
+If your language does not support log base r, use:
+  max = floor( ln( c * (r - 1) / (b * r^k) + 1 ) / ln(r) )
+
+Closing
+These formulas and observations give a compact toolkit for modeling generator costs, production, and bulk purchases. They also clarify why exponential cost growth necessitates prestige mechanics and careful multiplier design to keep gameplay interesting.
+
+
+# 2
+Another consideration is how closely to approximate the cost curve. For example, in cookie clicker with a 1.15 multiplier, the cost of successive buildings might be:
+
+100, 115, 132, 152, 174, 201, 231, 266, ...
+
+But you could also have a similar effect with this:
+
+100, 100, 100, 100, 100, 200, 200, 200, ...
+
+Doubling every five purchases yields a similar price curve. But there are plateaus followed by larger cliffs. Why might you do this?
+
+First, to make the prices more comprehensible. If you stick to round numbers and roughly double between them (100, 200, 500, 1000, etc.) then it is easier for the user to see at a glance how much it costs because you don't have too much precision which acts as a distraction.
+
+But, second, it is important to feel a sense of progress as well as a sense of increasing challenge. By keeping the cost the same for successive upgrades for a little while, the player can have the sense of getting ahead of the curve. Buying a new building feels more effective since it makes the next building more affordable. The cliff at the end increases the requirements more dramatically and marks a new obstacle to be overcome.
+
+Scaling can also communicate the the user which choices are more appropriate. Often, you'll have two different upgrades which are multiplied together to provide an effect. The best strategy here is to generally upgrade them both at about the same rate because 5*5 is bigger than 1*10. You can use scaling as a kind of nudge to push the user in the right direction here. The cost of one could be multiplied by the relative difference between them.
+
+One other thing to consider is discount scaling. A number of incremental games provides some kind of discount upgrade which reduces the prices of other upgrades. The key thing to remember here is that a discount multiplier can be tricky. So having things that provide flat discounts can have unintended effects.
+
+The relative difference between a 1% discount and a 2% discount is small. But the relative difference between a 98% discount and a 99% discount is huge. The latter halves all my costs! So however you scale your discounts, make sure that they have a larger headline effect lower levels and a smaller headline effect at larger levels. And your discount must never get to 100%.
+
+Diablo 1/2 had a discount system for elemental damage. And it avoided this problem by capping the discount at 75%. Sandcastle Builder has a single discount boost that provides a permanent 80% discount but you can't buy multiple levels of it.
