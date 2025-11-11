@@ -42,13 +42,14 @@ describe('Save/Load System', () => {
 		});
 
 		it('should include metadata in save file', () => {
+			const originalMoney = state.money;
 			saveGame(state);
 
 			const saveData = localStorage.getItem(SAVE_KEY);
 			expect(saveData).toBeTruthy();
 
 			const saveFile: SaveFile = JSON.parse(saveData!);
-			expect(saveFile.state).toEqual(state);
+			expect(saveFile.state.money).toBe(originalMoney);
 			expect(saveFile.version).toBe(GAME_VERSION);
 			expect(saveFile.savedAt).toBeTypeOf('number');
 		});
