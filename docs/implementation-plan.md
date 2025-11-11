@@ -3,6 +3,7 @@
 ## Table of Contents
 
 - [Overview](#overview)
+- [Economic Balance Principles & Formulas](#economic-balance-principles--formulas)
 - [Current Status](#current-status)
 - [Phase 0: Project Setup & Foundation](#phase-0-project-setup--foundation-complete)
 - [Phase 1: Core Game Systems](#phase-1-core-game-systems-complete)
@@ -22,6 +23,386 @@
 This implementation plan breaks down the Music Industry Simulator (AI Music Idle Game) into discrete, sequential tasks that must be completed in order. Each task builds on the previous tasks and should be completed one at a time.
 
 **This plan is designed for LINEAR execution - complete each task before moving to the next.**
+
+---
+
+## Economic Balance Principles & Formulas
+
+**CRITICAL: All implementations must follow these balance rules to ensure healthy game progression.**
+
+### Core Economic Scaling Rules
+
+#### Tier Progression Formula
+```
+For all purchasables (upgrades, generators, buildings):
+
+next_tier_cost = current_tier_cost * SCALE_FACTOR
+next_tier_benefit = current_tier_benefit * SCALE_FACTOR
+
+Where SCALE_FACTOR must be between 1.5 and 2.5
+NEVER exceed 5x jump between tiers
+
+Validation check:
+assert(next_cost / current_cost <= 5.0)
+assert(next_benefit / current_benefit <= 5.0)
+```
+
+#### Income Distribution Rule
+```
+At any progression milestone:
+
+previous_tier_contribution = previous_tier_revenue / total_revenue
+assert(previous_tier_contribution >= 0.20)
+
+Example: If player has tier 4 generators, tier 3 generators should
+still contribute 20-40% of total income
+```
+
+#### Anti-Pattern Examples
+```
+❌ WRONG - Cliff jump:
+Tier 3: +$100/sec cost=$1,000
+Tier 4: +$10,000/sec cost=$50,000  (100x benefit jump)
+
+✓ CORRECT - Graduated scaling:
+Tier 3: +$100/sec cost=$1,000
+Tier 4: +$250/sec cost=$2,500
+Tier 5: +$625/sec cost=$6,250  (2.5x scaling)
+```
+
+### Streaming Revenue Formula
+
+**This is the PRIMARY income source and must remain 15-30% of total income throughout the game.**
+
+```javascript
+streaming_revenue_per_tick = (
+  total_completed_songs *
+  total_fans *
+  BASE_STREAMING_RATE *
+  platform_multiplier
+)
+
+Where:
+- BASE_STREAMING_RATE: constant (e.g., 0.001 per fan per song per tick)
+- platform_multiplier: 1.0 by default, increases only when player owns
+  streaming platform (late game unlock)
+- No exponential multipliers allowed on streaming
+- This scales linearly with songs and fans ONLY
+```
+
+### Song Generation State Tracking
+
+```javascript
+State to track:
+{
+  total_completed_songs: integer,  // Increments on completion, never decreases
+  songs_in_queue: [                // Array of pending songs
+    {
+      completion_time: timestamp,
+      song_index: integer           // For ordering only
+    }
+  ]
+}
+
+On song completion:
+1. total_completed_songs += 1
+2. Remove completed song from songs_in_queue
+3. Streaming revenue recalculates automatically next tick
+
+IMPORTANT:
+- DO NOT store per-song metadata (quality, genre, etc.)
+- All bonuses apply globally to production rate
+- Song upgrades affect: production speed, queue capacity
+```
+
+### Album Release Mechanics
+
+**Albums provide burst income through one-time sales with exponential demand decay.**
+
+#### State
+```javascript
+{
+  active_album_batch: {
+    copies_pressed: integer,
+    copies_remaining: integer,
+    price_per_copy: float,
+    press_timestamp: timestamp,
+    revenue_generated: float
+  } | null,
+  last_album_timestamp: timestamp
+}
+
+Constraints:
+- Only 1 active album at a time
+- 48-hour cooldown between releases
+- Unsold copies expire after 30 days
+```
+
+#### Sales Simulation (Per Tick)
+```javascript
+const ALBUM_INTEREST_RATE = 0.01;        // 1% of fans buy per day at peak
+const ALBUM_DEMAND_DECAY_RATE = 0.15;    // Exponential decay after week 1
+
+// Demand curve:
+if (days_since_press <= 7) {
+  demand_multiplier = 1.0;  // Peak interest week 1
+} else {
+  days_past_peak = days_since_press - 7;
+  demand_multiplier = Math.exp(-0.15 * days_past_peak);
+  // Day 7: 100%, Day 14: 35%, Day 21: 12%, Day 30: 3%
+}
+
+// Sales this tick:
+fan_demand_rate = total_fans * ALBUM_INTEREST_RATE * demand_multiplier;
+potential_sales = fan_demand_rate * (tick_duration_seconds / 86400);
+sales_this_tick = Math.min(copies_remaining, potential_sales);
+revenue_this_tick = sales_this_tick * price_per_copy;
+```
+
+#### Pricing Formula
+```javascript
+// More expensive to press larger batches (sublinear scaling)
+function calculateCopiesFromCost(cost_paid) {
+  const BASE_COPIES_PER_DOLLAR = 10;
+  const SCALE_PENALTY = 0.5;  // Square root scaling
+  return Math.floor(BASE_COPIES_PER_DOLLAR * Math.pow(cost_paid, SCALE_PENALTY));
+}
+
+// Example: $1000 = 10k copies, $4000 = 20k copies (not 40k)
+
+function calculateSalePrice(cost_paid, copies) {
+  const production_cost_per_copy = cost_paid / copies;
+  const profit_margin = 1.5;  // 50% profit if all sell
+  return production_cost_per_copy * profit_margin;
+}
+```
+
+### Tour Mechanics
+
+**Tours provide temporary multipliers to ALL income sources.**
+
+#### State
+```javascript
+{
+  active_tour: {
+    start_time: timestamp,
+    end_time: timestamp,              // start_time + duration
+    duration_seconds: integer,        // 30-90 days
+    revenue_multiplier: float,        // 1.5-3.0x
+    tier: integer
+  } | null,
+  last_tour_end_time: timestamp,
+  tour_cooldown_seconds: integer      // 14-30 days
+}
+
+Constraints:
+- Only 1 active tour at a time (NO STACKING)
+- Cannot extend or modify mid-tour
+- Cooldown starts after tour ends
+- Cannot queue next tour
+```
+
+#### Revenue Boost Application
+```javascript
+function calculateTotalIncome() {
+  let base_income = 0;
+  base_income += streaming_revenue_per_tick;
+  base_income += album_sales_this_tick;
+  base_income += merch_revenue_per_tick;
+  // ... other sources
+
+  // Apply tour multiplier if active
+  if (active_tour !== null && now() < active_tour.end_time) {
+    return base_income * active_tour.revenue_multiplier;
+  }
+
+  return base_income;
+}
+```
+
+#### Tour Cost Formula
+```javascript
+// Tour cost scales with fanbase (sublinear to stay profitable)
+const BASE_TOUR_COST = 10000;
+const FAN_COST_SCALING = 0.5;  // Square root scaling
+
+venue_size_cost = BASE_TOUR_COST * Math.pow(total_fans / 1000, FAN_COST_SCALING);
+tier_multiplier = Math.pow(1.5, tier);
+duration_multiplier = duration / (30 * 86400);
+
+total_cost = venue_size_cost * tier_multiplier * duration_multiplier;
+
+// Net benefit: 30-50% income boost over tour duration
+// Cost scales sublinearly so tours stay profitable at all scales
+```
+
+### Balance Validation Checkpoints
+
+**Use these checks during development and testing:**
+
+```javascript
+// No single source dominates
+for (const [source, revenue] of Object.entries(income_sources)) {
+  const percentage = revenue / total_income;
+  if (percentage > 0.60) {
+    console.warn(`⚠️ ${source} provides ${percentage * 100}% - too dominant`);
+  }
+}
+
+// Streaming stays relevant
+const streaming_percentage = income_sources.streaming / total_income;
+if (streaming_percentage < 0.15 || streaming_percentage > 0.30) {
+  console.warn(`⚠️ Streaming at ${streaming_percentage * 100}% - should be 15-30%`);
+}
+
+// Previous tier contribution
+const previous_tier_contribution = previous_tier_revenue / total_revenue;
+if (previous_tier_contribution < 0.20) {
+  console.warn(`⚠️ Previous tier only ${previous_tier_contribution * 100}% - should be 20%+`);
+}
+```
+
+### Design Checklist
+
+**When adding new income source or tier:**
+
+- [ ] Previous tier still contributes 20%+ of total income
+- [ ] New source costs 1.5-2.5x previous tier
+- [ ] New source benefits 1.5-2.5x previous tier
+- [ ] Player needs 2-3 income streams active simultaneously
+- [ ] No single source exceeds 60% of total income
+- [ ] Streaming remains 15-30% of income
+- [ ] Progression speed allows mid-game mechanics to matter
+
+### Constants Reference
+
+```javascript
+// Tune during playtesting - these are starting values:
+
+const BASE_STREAMING_RATE = 0.001;           // Revenue per fan per song per tick
+const BASE_TICK_RATE = 1.0;                  // Seconds per game tick
+
+const ALBUM_INTEREST_RATE = 0.01;            // % of fans buying per day at peak
+const ALBUM_LIFETIME_DAYS = 30;              // Days before unsold copies expire
+const ALBUM_DEMAND_DECAY_RATE = 0.15;        // Exponential decay after week 1
+const ALBUM_COOLDOWN_HOURS = 48;             // Hours between releases
+
+const TOUR_MIN_DURATION_DAYS = 30;           // Shortest tour
+const TOUR_MAX_DURATION_DAYS = 90;           // Longest tour
+const TOUR_MIN_MULTIPLIER = 1.5;             // Weakest boost
+const TOUR_MAX_MULTIPLIER = 3.0;             // Strongest boost
+const TOUR_MIN_COOLDOWN_DAYS = 14;           // Min wait after tour
+const TOUR_MAX_COOLDOWN_DAYS = 30;           // Max wait after tour
+const BASE_TOUR_COST = 10000;                // Small venue baseline
+const FAN_COST_SCALING = 0.5;                // Square root scaling
+
+const TIER_SCALE_MIN = 1.5;                  // Minimum tier-to-tier multiplier
+const TIER_SCALE_MAX = 2.5;                  // Maximum tier-to-tier multiplier
+const TIER_SCALE_ABSOLUTE_MAX = 5.0;         // Never exceed this
+```
+
+### Save State Requirements
+
+```javascript
+// NO OFFLINE PROGRESS
+// Game only ticks when tab is active
+
+// Minimum save state:
+{
+  total_completed_songs: integer,
+  songs_in_queue: [...],
+  total_fans: integer,
+  platform_multiplier: float,
+
+  active_album_batch: {...} | null,
+  last_album_timestamp: timestamp,
+
+  active_tour: {...} | null,
+  last_tour_end_time: timestamp,
+  tour_cooldown_seconds: integer
+}
+```
+
+### Centralized Configuration
+
+**CRITICAL: All values, rates, and equations must be centrally configured from one JSON file.**
+
+**Requirements:**
+
+1. **Create src/lib/game/balance-config.json** containing all balance values
+2. **Use descriptive naming** for all constants and formulas
+3. **Group related values** by system (streaming, albums, tours, etc.)
+4. **Include comments** explaining what each value affects
+5. **Load at game startup** and use throughout the codebase
+6. **Never hardcode magic numbers** in system files
+
+**Example structure:**
+```json
+{
+  "streaming": {
+    "baseRate": 0.001,
+    "description": "Revenue per fan per song per tick",
+    "platformMultiplierDefault": 1.0,
+    "minIncomePercentage": 0.15,
+    "maxIncomePercentage": 0.30
+  },
+  "albums": {
+    "interestRate": 0.01,
+    "description": "Percentage of fans buying per day at peak demand",
+    "lifetimeDays": 30,
+    "demandDecayRate": 0.15,
+    "cooldownHours": 48,
+    "basecopiesPerDollar": 10,
+    "scalePenalty": 0.5,
+    "profitMargin": 1.5
+  },
+  "tours": {
+    "minDurationDays": 30,
+    "maxDurationDays": 90,
+    "minMultiplier": 1.5,
+    "maxMultiplier": 3.0,
+    "minCooldownDays": 14,
+    "maxCooldownDays": 30,
+    "baseCost": 10000,
+    "fanCostScaling": 0.5,
+    "description": "Tours provide temporary multipliers to ALL income"
+  },
+  "tierScaling": {
+    "minMultiplier": 1.5,
+    "maxMultiplier": 2.5,
+    "absoluteMax": 5.0,
+    "previousTierMinContribution": 0.20,
+    "description": "All tier progression must follow these scaling rules"
+  },
+  "balance": {
+    "maxSingleSourcePercentage": 0.60,
+    "minIncomeStreams": 2,
+    "maxIncomeStreams": 3,
+    "description": "Overall balance constraints"
+  }
+}
+```
+
+**Implementation:**
+```typescript
+// src/lib/game/balance-config.ts
+import balanceConfigJson from './balance-config.json';
+
+export const BALANCE_CONFIG = balanceConfigJson;
+
+// Usage in system files:
+import { BALANCE_CONFIG } from '$lib/game/balance-config';
+
+const BASE_STREAMING_RATE = BALANCE_CONFIG.streaming.baseRate;
+const ALBUM_INTEREST_RATE = BALANCE_CONFIG.albums.interestRate;
+```
+
+**Benefits:**
+- Single source of truth for all balance values
+- Easy to tune during playtesting without code changes
+- Clear documentation of what each value affects
+- Can hot-reload config during development
+- Export/import config for balance testing iterations
 
 ---
 
@@ -266,6 +647,13 @@ Create the song generation system with queue, cost calculation, and income.
 - Queue processes sequentially
 - Unit tests have >80% coverage
 
+**Implementation Reference:**
+See [Song Generation State Tracking](#song-generation-state-tracking) in Economic Balance Principles section for exact state structure and completion logic. Key requirements:
+- Track `total_completed_songs` (increments only, never decreases)
+- Track `songs_in_queue` array with completion_time and song_index
+- DO NOT store per-song metadata (quality, genre, etc.)
+- All bonuses apply globally to production rate
+
 ### Task 1.4: Implement Income & Fan Systems ✅ COMPLETE
 
 **Prerequisites:** Task 1.3 complete
@@ -301,6 +689,15 @@ Create income generation and fan accumulation systems.
 - Peak fans tracked accurately
 - Frame-independent calculations
 - Unit tests verify calculations
+
+**Implementation Reference:**
+See [Streaming Revenue Formula](#streaming-revenue-formula) in Economic Balance Principles section. **CRITICAL requirements:**
+- Formula: `streaming_revenue_per_tick = total_completed_songs * total_fans * BASE_STREAMING_RATE * platform_multiplier`
+- BASE_STREAMING_RATE is a constant (e.g., 0.001)
+- platform_multiplier = 1.0 by default (only increases with late-game platform ownership)
+- **NO exponential multipliers allowed on streaming**
+- Streaming must remain 15-30% of total income throughout the game
+- Scales linearly with songs and fans ONLY
 
 ### Task 1.5: Implement Tech Upgrade System ✅ COMPLETE
 
@@ -699,6 +1096,47 @@ Create the physical album system that unlocks at phase 2.
 - Payouts calculated correctly
 - Unit tests verify logic
 
+**Implementation Reference:**
+See [Album Release Mechanics](#album-release-mechanics) in Economic Balance Principles section. **CRITICAL requirements:**
+
+**State to track:**
+```javascript
+{
+  active_album_batch: {
+    copies_pressed: integer,
+    copies_remaining: integer,
+    price_per_copy: float,
+    press_timestamp: timestamp,
+    revenue_generated: float
+  } | null,
+  last_album_timestamp: timestamp
+}
+```
+
+**Key constraints:**
+- Only 1 active album batch at a time
+- 48-hour cooldown between releases (ALBUM_COOLDOWN_HOURS = 48)
+- Unsold copies expire after 30 days (ALBUM_LIFETIME_DAYS = 30)
+- Demand curve: Week 1 at 100%, then exponential decay (Math.exp(-0.15 * days_past_peak))
+- Week 2: 35%, Week 3: 12%, Week 4: 3%
+
+**Sales formula per tick:**
+```javascript
+fan_demand_rate = total_fans * 0.01 * demand_multiplier;  // 1% of fans buy at peak
+potential_sales = fan_demand_rate * (tick_duration_seconds / 86400);
+sales_this_tick = Math.min(copies_remaining, potential_sales);
+revenue_this_tick = sales_this_tick * price_per_copy;
+```
+
+**Pricing (sublinear scaling):**
+```javascript
+// More expensive to press larger batches
+copies = Math.floor(10 * Math.pow(cost_paid, 0.5));  // Square root scaling
+// Example: $1000 = 10k copies, $4000 = 20k copies (not 40k)
+
+sale_price = (cost_paid / copies) * 1.5;  // 50% profit if all sell
+```
+
 ### Task 4.3: Implement Tour & Concert System
 
 **Prerequisites:** Task 4.2 complete
@@ -710,13 +1148,13 @@ Create the tour and concert system that unlocks at phase 3.
 
 1. Create src/lib/systems/tours.ts:
    - unlockTours(state: GameState): boolean
-   - startTour(state: GameState): Tour
-   - processTours(state: GameState, deltaTime: number): void
-   - calculateTourIncome(state: GameState): number
-   - canRunMultipleTours(state: GameState): number
-2. Tours run automatically once unlocked
-3. Income scales with total song catalog
-4. Can run multiple simultaneous tours (AI advantage)
+   - startTour(state: GameState, tier: number, cost: number): boolean
+   - checkTourExpiration(state: GameState): void
+   - calculateTourCost(tier: number, duration: number, multiplier: number): number
+   - calculateTotalIncome(state: GameState): number (with tour multiplier applied)
+2. Tours provide temporary multipliers to ALL income sources
+3. **ONLY 1 tour active at a time** - tours cannot stack
+4. Tours have duration (30-90 days) and cooldown (14-30 days)
 5. Upgrade system for exploitation mechanics
 6. Unlock requirements:
    - 10 physical albums released
@@ -730,9 +1168,63 @@ Create the tour and concert system that unlocks at phase 3.
 
 **Success criteria:**
 - Unlocks at correct milestone
-- Tours generate passive income
-- Multiple tours can run simultaneously
+- Tours boost ALL income sources with multiplier
+- Only 1 tour active at a time (validation enforced)
+- Tour expires after duration, cooldown starts
 - Unit tests verify calculations
+
+**Implementation Reference:**
+See [Tour Mechanics](#tour-mechanics) in Economic Balance Principles section. **CRITICAL requirements:**
+
+**State to track:**
+```javascript
+{
+  active_tour: {
+    start_time: timestamp,
+    end_time: timestamp,              // start_time + duration
+    duration_seconds: integer,        // 30-90 days
+    revenue_multiplier: float,        // 1.5-3.0x
+    tier: integer
+  } | null,
+  last_tour_end_time: timestamp,
+  tour_cooldown_seconds: integer      // 14-30 days
+}
+```
+
+**Key constraints:**
+- **ONLY 1 active tour at a time - NO STACKING**
+- Cannot extend or modify mid-tour
+- Cannot queue next tour
+- Cooldown starts after tour ends, not when purchased
+- Tour multiplier applies to ALL income sources
+
+**Revenue boost application:**
+```javascript
+function calculateTotalIncome() {
+  let base_income = streaming + albums + merch + ...;
+
+  if (active_tour !== null && now() < active_tour.end_time) {
+    return base_income * active_tour.revenue_multiplier;
+  }
+
+  return base_income;
+}
+```
+
+**Tour cost formula (sublinear scaling):**
+```javascript
+venue_size_cost = 10000 * Math.pow(total_fans / 1000, 0.5);  // Square root
+tier_multiplier = Math.pow(1.5, tier);
+duration_multiplier = duration / (30 * 86400);
+total_cost = venue_size_cost * tier_multiplier * duration_multiplier;
+
+// Net benefit: 30-50% income boost over tour duration
+// Example: 1M fans, 30-day tour, 2x multiplier
+//   - Revenue without tour: $25.9M
+//   - Revenue with tour: $51.8M (gain: $25.9M)
+//   - Tour cost: ~$10M
+//   - Net profit: $15.9M (61% gain)
+```
 
 ### Task 4.4: Implement Exploitation Abilities System
 
@@ -1221,6 +1713,55 @@ Perform comprehensive balance testing and tune game progression.
 - No game-breaking exploits
 - Progression feels smooth
 - Balance report documented
+
+**Implementation Reference:**
+See [Balance Validation Checkpoints](#balance-validation-checkpoints), [Design Checklist](#design-checklist), and [Constants Reference](#constants-reference) in Economic Balance Principles section.
+
+**Required validation checks during testing:**
+
+```javascript
+// 1. No single source dominates (max 60% of total income)
+for (const [source, revenue] of Object.entries(income_sources)) {
+  const percentage = revenue / total_income;
+  if (percentage > 0.60) {
+    console.warn(`⚠️ ${source} provides ${percentage * 100}% - too dominant`);
+  }
+}
+
+// 2. Streaming stays relevant (15-30% of total income)
+const streaming_percentage = streaming_revenue / total_income;
+if (streaming_percentage < 0.15 || streaming_percentage > 0.30) {
+  console.warn(`⚠️ Streaming at ${streaming_percentage * 100}% - should be 15-30%`);
+}
+
+// 3. Previous tier contributes 20%+ of total income
+const previous_tier_contribution = previous_tier_revenue / total_revenue;
+if (previous_tier_contribution < 0.20) {
+  console.warn(`⚠️ Previous tier only ${previous_tier_contribution * 100}% - should be 20%+`);
+}
+```
+
+**Balance checklist for each income source/tier:**
+- [ ] Previous tier still contributes 20%+ of total income
+- [ ] New source costs 1.5-2.5x previous tier (never >5x)
+- [ ] New source benefits 1.5-2.5x previous tier (never >5x)
+- [ ] Player needs 2-3 income streams active simultaneously
+- [ ] No single source exceeds 60% of total income
+- [ ] Streaming remains 15-30% of income
+- [ ] Progression speed allows mid-game mechanics to matter
+
+**Constants to tune in src/lib/game/config.ts:**
+```javascript
+const BASE_STREAMING_RATE = 0.001;           // Start here, adjust ±50%
+const ALBUM_INTEREST_RATE = 0.01;            // 1% of fans buy at peak
+const ALBUM_DEMAND_DECAY_RATE = 0.15;        // Exponential decay constant
+const ALBUM_COOLDOWN_HOURS = 48;             // Hours between releases
+const TOUR_MIN_MULTIPLIER = 1.5;             // Weakest boost
+const TOUR_MAX_MULTIPLIER = 3.0;             // Strongest boost
+const BASE_TOUR_COST = 10000;                // Small venue baseline
+const TIER_SCALE_MIN = 1.5;                  // Tier-to-tier multiplier
+const TIER_SCALE_MAX = 2.5;                  // Never exceed 5.0
+```
 
 ### Task 6.5: Write Comprehensive Test Suite
 
