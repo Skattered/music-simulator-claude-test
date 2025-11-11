@@ -44,6 +44,27 @@
 			generateIncome(gameState, deltaTime);
 			generateFans(gameState, deltaTime);
 
+			// Process advanced systems (imported dynamically to avoid circular deps)
+			// Process prestige legacy income
+			if (gameState.legacyArtists.length > 0) {
+				// applyLegacyIncome would go here
+			}
+
+			// Process physical album sales
+			if (gameState.activeAlbumBatch) {
+				// processAlbumSales would go here
+			}
+
+			// Process active tour
+			if (gameState.activeTour) {
+				// processTour would go here
+			}
+
+			// Process exploitation boosts (remove expired)
+			if (gameState.activeBoosts.length > 0) {
+				gameState.activeBoosts = gameState.activeBoosts.filter((b) => b.expiresAt > Date.now());
+			}
+
 			// Auto-save check
 			const currentTime = Date.now();
 			const timeSinceLastSave = (currentTime - (engine as any).lastSaveTime) / 1000;
