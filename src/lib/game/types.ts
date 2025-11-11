@@ -3,17 +3,8 @@
  * Core game state and data structures
  */
 
-/**
- * Queued song waiting to be generated
- */
-export interface QueuedSong {
-	/** UUID for the song */
-	id: string;
-	/** Timestamp when song will complete */
-	completionTime: number;
-	/** Index for ordering in queue */
-	songIndex: number;
-}
+// Songs are tracked as simple counters - no individual song objects needed
+// All bonuses and effects apply globally to production rate
 
 /**
  * Current artist information
@@ -201,8 +192,10 @@ export interface GameState {
 	/** --- SONGS --- */
 	/** Total completed songs (never decreases) */
 	totalCompletedSongs: number;
-	/** Songs currently being generated */
-	songsInQueue: QueuedSong[];
+	/** Number of songs waiting in queue */
+	songsInQueue: number;
+	/** Progress of current song being generated (0-1) */
+	currentSongProgress: number;
 
 	/** --- UPGRADES & TECH --- */
 	/** Current tech tier (1-7) */

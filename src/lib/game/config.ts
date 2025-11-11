@@ -79,7 +79,8 @@ export function createInitialGameState(): GameState {
 
 		// Song state
 		totalCompletedSongs: 0,
-		songsInQueue: [],
+		songsInQueue: 0,
+		currentSongProgress: 0,
 
 		// Tech progression
 		currentTechTier: 1, // Start at tier 1: Third-party Web Services
