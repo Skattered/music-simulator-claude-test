@@ -3,11 +3,13 @@
 	import { GameEngine } from '$lib/game/engine';
 	import { loadGame, saveGame } from '$lib/game/save';
 	import { createInitialGameState } from '$lib/game/config';
-	import { queueSongs, processSongQueue, calculateMaxAffordable } from '$lib/systems/songs';
+	import { processSongQueue } from '$lib/systems/songs';
 	import { generateIncome } from '$lib/systems/income';
 	import { generateFans } from '$lib/systems/fans';
 	import { generateArtistName } from '$lib/data/names';
 	import ResourceBar from '$lib/components/ResourceBar.svelte';
+	import SongGenerator from '$lib/components/SongGenerator.svelte';
+	import TechTree from '$lib/components/TechTree.svelte';
 	import type { GameState } from '$lib/game/types';
 
 	// Game state - reactive
@@ -60,16 +62,6 @@
 			engine.stop();
 		}
 	});
-
-	// Button handlers
-	function handleQueueSong(count: number) {
-		queueSongs(gameState, count);
-	}
-
-	function handleQueueMax() {
-		const max = calculateMaxAffordable(gameState);
-		queueSongs(gameState, max);
-	}
 </script>
 
 <div class="game-container min-h-screen bg-game-bg text-white p-4">
@@ -84,54 +76,16 @@
 		<ResourceBar bind:gameState={gameState} />
 
 		<!-- Song Generator Panel -->
-		<div class="bg-game-panel p-6 rounded-lg shadow-lg border border-gray-800">
-			<h2 class="text-2xl font-bold mb-4 text-game-accent">🎵 Generate Songs</h2>
+		<SongGenerator bind:gameState={gameState} />
 
-			{#if gameState.currentSongProgress > 0 && gameState.songsInQueue > 0}
-				<div class="mb-4">
-					<div class="text-sm text-gray-400 mb-2">
-						Generating song... {Math.floor(gameState.currentSongProgress * 100)}%
-					</div>
-					<div class="progress-bar bg-gray-800 rounded-full h-3 overflow-hidden">
-						<div
-							class="bg-game-accent h-full transition-all duration-100"
-							style="width: {gameState.currentSongProgress * 100}%"
-						></div>
-					</div>
-				</div>
-			{/if}
+		<!-- Tech Tree Panel -->
+		<TechTree bind:gameState={gameState} />
 
-			<div class="flex flex-wrap gap-2">
-				<button
-					onclick={() => handleQueueSong(1)}
-					class="px-4 py-2 rounded font-semibold transition-colors bg-[var(--color-game-accent)] hover:bg-blue-600 text-white"
-				>
-					Generate 1 Song
-				</button>
-				<button
-					onclick={() => handleQueueSong(5)}
-					class="px-4 py-2 rounded font-semibold transition-colors bg-[var(--color-game-accent)] hover:bg-blue-600 text-white"
-				>
-					Generate 5 Songs
-				</button>
-				<button
-					onclick={() => handleQueueSong(10)}
-					class="px-4 py-2 rounded font-semibold transition-colors bg-[var(--color-game-accent)] hover:bg-blue-600 text-white"
-				>
-					Generate 10 Songs
-				</button>
-				<button
-					onclick={handleQueueMax}
-					class="px-4 py-2 rounded font-semibold transition-colors bg-gray-700 hover:bg-gray-600 text-white"
-				>
-					Generate Max
-				</button>
-			</div>
-		</div>
-
-		<!-- Placeholder for future components -->
+		<!-- Placeholder for future features -->
 		<div class="bg-game-panel p-6 rounded-lg shadow-lg border border-gray-800 opacity-50">
-			<p class="text-center text-gray-500">Tech Tree & Upgrades - Coming Soon</p>
+			<p class="text-center text-gray-500">
+				Advanced Features (Physical Albums, Tours, Exploitation) - Coming Soon
+			</p>
 		</div>
 	</div>
 </div>
